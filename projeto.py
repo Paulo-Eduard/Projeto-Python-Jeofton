@@ -381,3 +381,333 @@ def escolher_classe():
             "imagem": img_tanque
         }
     }
+    
+    largura_botao = 200
+    altura_botao = 60
+    espacamento = 30
+    total_largura = len(classes) * largura_botao + (len(classes)-1)*espacamento
+    start_x = (LARGURA - total_largura) // 2
+    y = ALTURA - 150
+    botoes = [Botao(nome_classe, start_x + i*(largura_botao + espacamento), y, largura_botao, altura_botao) 
+              for i, nome_classe in enumerate(classes)]
+
+    while rodando:
+        screen.fill(PRETO)
+        titulo = fonte.render("Escolha sua classe", True, BRANCO)
+        screen.blit(titulo, (LARGURA//2 - titulo.get_width()//2, 50))
+
+        # Desenhar imagens das classes
+        for i, (nome_classe, dados) in enumerate(classes.items()):
+            x = start_x + i*(largura_botao + espacamento)
+            y_img = 120
+            screen.blit(dados["imagem"], (x + (largura_botao - dados["imagem"].get_width())//2, y_img))
+
+        for bot in botoes:
+            bot.desenhar()
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                pos = event.pos
+                for bot in botoes:
+                    if bot.clicado(pos):
+                        return bot.texto, classes[bot.texto]
+        clock.tick(30)
+
+# --- Função para pedir nome com Tkinter ---
+def pedir_nome():
+    root = tk.Tk()
+    root.withdraw()
+    nome = simpledialog.askstring("Nome do personagem", "Digite o nome do seu personagem:")
+    root.destroy()
+    return nome if nome and nome.strip() else "Herói"
+
+# --- Inimigos ---
+inimigos = [
+    Personagem("Slime Corrosivo", "Monstro", 120, 50, 25,
+              {"Ataque Ácido": (1.1, "Reduz defesa em 15%"),
+               "Divisão": (0.5, "Cria um Slime menor ao morrer")},
+              img_slime, (800, 200)),
+    
+    Personagem("Aranha Venenosa", "Monstro", 180, 60, 30,
+              {"Teia Paralisante": (0.8, "Reduz velocidade em 30%"),
+               "Mordida Tóxica": (1.6, "Envenena por 3 turnos")},
+              img_aranha, (800, 200)),
+    
+    Personagem("Goblin Berserker", "Elite", 190, 65, 45,
+              {"Fúria Sangrenta": (1.6, "Aumenta ataque ao perder vida"),
+               "Investida Mortal": (1.8, "Dano crítico abaixo de 30% vida")},
+              img_goblin, (800, 200))
+]
+
+# --- Dragão (chefão) ---
+boss = Personagem("Ignis, o Dragão", "Boss", 200, 85, 60,
+                 {
+                    "Sopro Infernal": (1.4, "Queima todo o campo de batalha"),
+                    "Garras do Abismo": (1.6, "Ignora 50% da defesa"),
+                    "Majestade dos Céus": (2.0, "Ataque final abaixo de 20% vida")
+                 },
+                 img_dragao, (800, 150))
+boss.vida_barras = 3
+boss.vida_por_barra = boss.vida_max / boss.vida_barras
+
+# --- Sistema de Batalha ---
+def batalha(jogador, inimigo):
+    # Ajuste de dificuldade para inimigos específicos
+    if inimigo.nome in ["Goblin Berserker", "Ignis, o Dragão"]:
+        fase_atual = (inimigos + [boss]).index(inimigo) + 1
+        multiplicador = 1 + (fase_atual * 0.25)
+        
+        inimigo.vida_max = int(inimigo.vida_max * multiplicador)
+        inimigo.vida = inimigo.vida_max
+        inimigo.ataque = int(inimigo.ataque * multiplicador)
+        inimigo.defesa = int(inimigo.defesa * multiplicador)
+        
+        if inimigo.nome == "Ignis, o Dragão":
+            inimigo.vida_barras = 3
+            inimigo.vida_por_barra = inimigo.vida_max / inimigo.vida_barras
+    
+    mostrar_texto_tela(f"Você encontrou {inimigo.nome}! Prepare-se para a batalha.", "Iniciar Batalha")
+    
+    # Configurações do menu de batalha
+    menu_aberto = False
+    rodando = True
+    mensagem = "O que você vai fazer?"
+
+    # Retângulos para o menu de batalha
+    menu_principal_rect = pygame.Rect(0, ALTURA - 120, LARGURA, 120)
+    botoes_acoes = [
+        {"texto": "ATACAR", "rect": pygame.Rect(10, ALTURA - 110, 180, 45)},
+        {"texto": "FUGIR", "rect": pygame.Rect(200, ALTURA - 110, 180, 45)},
+    ]
+
+    # Menu de ataques
+    habilidades = list(jogador.skills.items())
+    botoes_ataques = []
+    for i, (nome_skill, (multiplicador, descricao)) in enumerate(habilidades):
+        if i < 2:
+            rect = pygame.Rect(10 + (i % 2) * 190, ALTURA - 110 + (i // 2) * 50, 180, 45)
+        else:
+            rect = pygame.Rect(10 + (i % 2) * 190, ALTURA - 60 + ((i-2) // 2) * 50, 180, 45)
+        botoes_ataques.append({
+            "texto": nome_skill,
+            "rect": rect,
+            "multiplicador": multiplicador,
+            "descricao": descricao
+        })
+
+    while rodando:
+        screen.fill(PRETO)
+        screen.blit(img_fundo, (0, 0))
+
+        # Desenhar personagens
+        jogador.desenhar()
+        inimigo.desenhar()
+
+        # Mostrar vida
+        texto_vida_jogador = fonte.render(f"{jogador.nome}: {jogador.vida}/{jogador.vida_max} HP", True, BRANCO)
+        texto_vida_inimigo = fonte.render(f"{inimigo.nome}: {inimigo.vida}/{inimigo.vida_max} HP", True, BRANCO)
+        screen.blit(texto_vida_jogador, (20, 20))
+        screen.blit(texto_vida_inimigo, (LARGURA - texto_vida_inimigo.get_width() - 20, 20))
+
+        # Desenhar menu de batalha
+        pygame.draw.rect(screen, CINZA, menu_principal_rect, border_radius=10)
+        pygame.draw.rect(screen, BRANCO, menu_principal_rect, 2, border_radius=10)
+
+        if not menu_aberto:
+            # Menu principal
+            texto_mensagem = fonte.render(mensagem, True, BRANCO)
+            screen.blit(texto_mensagem, (20, ALTURA - 140))
+
+            for botao in botoes_acoes:
+                cor = ROXO if botao["rect"].collidepoint(pygame.mouse.get_pos()) else AZUL
+                pygame.draw.rect(screen, cor, botao["rect"], border_radius=8)
+                pygame.draw.rect(screen, BRANCO, botao["rect"], 2, border_radius=8)
+                texto = fonte.render(botao["texto"], True, BRANCO)
+                screen.blit(texto, (botao["rect"].x + 10, botao["rect"].y + 10))
+        else:
+            # Menu de ataques
+            pygame.draw.rect(screen, CINZA, menu_principal_rect, border_radius=10)
+            pygame.draw.rect(screen, BRANCO, menu_principal_rect, 2, border_radius=10)
+
+            texto_mensagem = fonte.render("Escolha um ataque:", True, BRANCO)
+            screen.blit(texto_mensagem, (20, ALTURA - 140))
+
+            for botao in botoes_ataques:
+                cor = ROXO if botao["rect"].collidepoint(pygame.mouse.get_pos()) else AZUL
+                pygame.draw.rect(screen, cor, botao["rect"], border_radius=8)
+                pygame.draw.rect(screen, BRANCO, botao["rect"], 2, border_radius=8)
+                texto = fonte_pequena.render(botao["texto"], True, BRANCO)
+                screen.blit(texto, (botao["rect"].x + 10, botao["rect"].y + 10))
+
+                # Mostrar descrição quando o mouse está sobre o ataque
+                if botao["rect"].collidepoint(pygame.mouse.get_pos()):
+                    desc = fonte_pequena.render(botao["descricao"], True, BRANCO)
+                    screen.blit(desc, (20, ALTURA - 170))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+                
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                pos = event.pos
+                
+                if not menu_aberto:
+                    # Menu principal
+                    for botao in botoes_acoes:
+                        if botao["rect"].collidepoint(pos):
+                            if botao["texto"] == "ATACAR":
+                                menu_aberto = True
+                                mensagem = "Escolha um ataque:"
+                            elif botao["texto"] == "FUGIR":
+                                if random.random() > 0.7:  # 30% de chance de fugir
+                                    mostrar_texto_tela("Você fugiu da batalha!", "Continuar")
+                                    return True
+                                mostrar_texto_tela("Não foi possível fugir!", "Continuar")
+                                # Inimigo ataca se falhar em fugir
+                                dano_inimigo = max(1, int(inimigo.calcular_dano() - jogador.defesa))
+                                jogador.levar_dano(dano_inimigo)
+                                mostrar_texto_tela(f"{inimigo.nome} atacou e causou {dano_inimigo} de dano!", "Continuar")
+                                if jogador.vida <= 0:
+                                    mostrar_texto_tela("Você foi derrotado! Game Over.", "Sair")
+                                    return False
+                else:
+                    # Menu de ataques
+                    for botao in botoes_ataques:
+                        if botao["rect"].collidepoint(pos):
+                            # Ataque do jogador
+                            dano = max(1, int(jogador.calcular_dano(botao["multiplicador"]) - inimigo.defesa))
+                            inimigo.levar_dano(dano)
+                            mostrar_texto_tela(f"{jogador.nome} usou {botao['texto']} e causou {dano} de dano!", "Continuar")
+                            
+                            if inimigo.vida <= 0:
+                                mostrar_texto_tela(f"{inimigo.nome} foi derrotado!", "Continuar")
+                                return True
+
+                            # Ataque do inimigo
+                            dano_inimigo = max(1, int(inimigo.calcular_dano() - jogador.defesa))
+                            jogador.levar_dano(dano_inimigo)
+                            mostrar_texto_tela(f"{inimigo.nome} atacou e causou {dano_inimigo} de dano!", "Continuar")
+
+                            if jogador.vida <= 0:
+                                mostrar_texto_tela("Você foi derrotado! Game Over.", "Sair")
+                                return False
+                            
+                            menu_aberto = False
+                            mensagem = "O que você vai fazer?"
+                            break
+
+                    # Verificar se clicou fora para voltar
+                    if not any(botao["rect"].collidepoint(pos) for botao in botoes_ataques):
+                        menu_aberto = False
+                        mensagem = "O que você vai fazer?"
+
+        clock.tick(30)
+
+# --- Loop principal do jogo ---
+def main():
+    progresso = menu_inicial()
+
+    if progresso:
+        nome, classe_nome, vida_atual = progresso
+        _, dados_classe = escolher_classe_por_nome(classe_nome)
+        jogador = Personagem(nome, classe_nome, dados_classe["vida_max"], dados_classe["ataque"],
+                           dados_classe["defesa"], dados_classe["skills"], dados_classe["imagem"], (150, 200))
+        jogador.vida = vida_atual
+    else:
+        nome = pedir_nome()
+        classe_nome, dados_classe = escolher_classe()
+        jogador = Personagem(nome, classe_nome, dados_classe["vida_max"], dados_classe["ataque"],
+                           dados_classe["defesa"], dados_classe["skills"], dados_classe["imagem"], (150, 200))
+
+    # História introdutória
+    historia = """
+Ano 2025. O mundo está à beira do caos — segredos antigos começam a emergir das sombras.
+
+Você, um jovem inconformado com a rotina, recebe uma mensagem codificada que muda tudo:
+"Eldoria não é apenas um castelo... é a chave para o destino da humanidade."
+
+Sem saber em quem confiar, você é lançado numa corrida contra o tempo, onde inimigos poderosos e mistérios proibidos tentam impedir sua missão.
+
+Cada passo pode ser o último. Sua escolha: fugir e desaparecer ou enfrentar o desconhecido e reescrever a história.
+
+A jornada que vai mudar tudo começa agora. Prepare-se.
+"""
+    mostrar_texto_tela(historia, "Começar Jornada")
+
+    fases = inimigos + [boss]
+
+    for inimigo in fases:
+        historia_inimigo = f"""
+        Andar {fases.index(inimigo)+1} do Castelo de Aincrad
+        
+        Você está avançando pelo castelo quando encontra {inimigo.nome}.
+        Prepare-se para a luta!
+        """
+        mostrar_texto_tela(historia_inimigo, "Iniciar Batalha")
+        
+        venceu = batalha(jogador, inimigo)
+        if not venceu:
+            salvar_progresso(jogador.nome, jogador.classe, jogador.vida)
+            pygame.quit()
+            sys.exit()
+        else:
+            # Curar o jogador um pouco a cada vitória
+            jogador.curar(int(jogador.vida_max * 0.3))
+            salvar_progresso(jogador.nome, jogador.classe, jogador.vida)
+            
+            # História entre fases
+            if inimigo.nome == "Slime Corrosivo":
+                historia_vitoria = """
+                Após derrotar o Slime, você encontra um vilarejo seguro.
+                Os NPCs agradecem por sua ajuda e oferecem suprimentos.
+                
+                Você se sente mais forte para os próximos desafios.
+                """
+            elif inimigo.nome == "Aranha Venenosa":
+                historia_vitoria = """
+                Com a Aranha derrotada, você desbloqueia a passagem para o próximo andar.
+                Um novo desafio aguarda...
+                
+                Você avança para o próximo nível do castelo.
+                """
+            elif inimigo.nome == "Goblin Berserker":
+                historia_vitoria = """
+                Os Goblins eram guardiões do portal para as profundezas do castelo.
+                Você sente que está chegando perto do objetivo final.
+                
+                O chefe final do andar está próximo!
+                """
+            else:
+                historia_vitoria = f"""
+                Você derrotou {inimigo.nome}!
+                
+                Recupere suas forças para o próximo desafio.
+                """
+            
+            mostrar_texto_tela(historia_vitoria, "Continuar")
+             # História final
+    historia_final = """
+Com o rugido final do Dragão ecoando pelas ruínas, o castelo treme...
+Os portões se abrem não para a liberdade, mas para um novo mundo além da realidade virtual.
+
+Você não apenas sobreviveu a Sword Art Online — você despertou algo adormecido no código do jogo.  
+Uma nova dimensão se forma à sua frente, moldada por escolhas, segredos e poder oculto.
+
+Sua vitória marcou o fim de um ciclo... e o início de algo muito maior.
+
+A verdadeira aventura está apenas começando.
+"""
+
+    mostrar_texto_tela(historia_final, "Sair")
+
+    salvar_progresso(jogador.nome, jogador.classe, jogador.vida)
+    pygame.quit()   
+if _name_ == "_main_":
+    main()
