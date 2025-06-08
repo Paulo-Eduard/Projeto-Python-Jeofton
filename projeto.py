@@ -10,7 +10,7 @@ pygame.init()
 # --- Configurações da tela ---
 LARGURA, ALTURA = 1280, 720
 screen = pygame.display.set_mode((LARGURA, ALTURA))
-pygame.display.set_caption("NexBlade")
+pygame.display.set_caption("Dragon hunt")
 
 # --- Cores ---
 BRANCO = (255, 255, 255)
@@ -251,8 +251,8 @@ def menu_inicial():
         overlay = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
         screen.blit(overlay, (0, 0))
-        
-        titulo = fonte_grande.render("NexBlade", True, BRANCO)
+
+        titulo = fonte_grande.render("Dragon Hunt", True, BRANCO)
         screen.blit(titulo, (LARGURA//2 - titulo.get_width()//2, ALTURA//4))
         
         for bot in botoes:
@@ -708,6 +708,6 @@ A verdadeira aventura está apenas começando.
     mostrar_texto_tela(historia_final, "Sair")
 
     salvar_progresso(jogador.nome, jogador.classe, jogador.vida)
-    pygame.quit()   
-if _name_ == "_main_":
+    pygame.quit()
+if __name__ == "__main__":
     main()
